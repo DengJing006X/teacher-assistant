@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>老师助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+
+/* Header */
+.header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: #07c160; color: white; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.header h1 { font-size: 17px; font-weight: 600; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.lang-btn, .settings-btn {
+  background: rgba(255,255,255,0.2); border: none; color: white;
+  padding: 6px 12px; border-radius: 14px; font-size: 13px; cursor: pointer;
+  line-height: 1;
+}
+.lang-btn:hover, .settings-btn:hover { background: rgba(255,255,255,0.3); }
+.settings-btn { font-size: 18px; padding: 4px 10px; }
+
+/* Chat container */
+.chat-container {
+  padding: 60px 12px 80px; max-width: 600px; margin: 0 auto;
+}
+
+/* Messages */
+.message {
+  display: flex; margin-bottom: 16px; animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.message.user { justify-content: flex-end; }
+.message.bot { justify-content: flex-start; }
+
+.bubble {
+  max-width: 80%; padding: 10px 14px; border-radius: 12px;
+  font-size: 15px; line-height: 1.6; word-break: break-word;
+  white-space: pre-wrap;
+}
+.message.user .bubble {
+  background: #07c160; color: white;
+  border-bottom-right-radius: 4px;
+}
+.message.bot .bubble {
+  background: white; color: #333;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.bubble .source {
+  font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 4px;
+}
+.message.bot .bubble .source { color: #999; }
+
+/* Language label */
+.lang-label {
+  font-size: 11px; color: #999; text-align: center;
+  margin-bottom: 16px; padding: 4px 0;
+}
+
+/* Input area */
+.input-area {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: white; border-top: 1px solid #e8e8e8;
+  padding: 8px 12px; display: flex; align-items: center; gap: 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.input-area input {
+  flex: 1; border: none; outline: none; font-size: 16px;
+  padding: 8px 4px; background: transparent;
+}
+.input-area input::placeholder { color: #bbb; }
+.send-btn {
+  background: #07c160; border: none; color: white; width: 40px; height: 40px;
+  border-radius: 50%; font-size: 18px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.send-btn:disabled { background: #ccc; cursor: not-allowed; }
+.send-btn:hover:not(:disabled) { background: #06ad56; }
+
+/* Loading dots */
+.typing {
+  display: inline-flex; align-items: center; gap: 3px; padding: 4px 0;
+}
+.typing span {
+  width: 6px; height: 6px; border-radius: 50%; background: #999;
+  animation: typing 1.4s infinite both;
+}
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* Welcome */
+.welcome {
+  text-align: center; padding: 60px 20px; color: #999;
+}
+.welcome .icon { font-size: 48px; margin-bottom: 12px; }
+.welcome h2 { font-size: 18px; color: #666; margin-bottom: 8px; }
+.welcome p { font-size: 14px; line-height: 1.8; }
+
+/* Settings modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4); z-index: 200;
+  justify-content: center; align-items: flex-start; padding-top: 60px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: white; border-radius: 12px; padding: 20px;
+  width: 90%; max-width: 400px; max-height: 70vh; overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.modal h2 { font-size: 17px; margin-bottom: 16px; color: #333; }
+.modal-close {
+  float: right; background: none; border: none; font-size: 22px;
+  color: #999; cursor: pointer; line-height: 1;
+}
+.file-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+}
+.file-name { font-size: 14px; color: #333; flex: 1; word-break: break-all; }
+.file-size { font-size: 12px; color: #999; margin-left: 8px; }
+.file-del {
+  background: none; border: none; color: #ff4d4f; font-size: 18px;
+  cursor: pointer; padding: 4px; margin-left: 8px; line-height: 1;
+}
+.upload-area {
+  border: 2px dashed #ddd; border-radius: 8px; padding: 24px;
+  text-align: center; margin: 12px 0; cursor: pointer;
+  color: #999; font-size: 14px; transition: all 0.2s;
+}
+.upload-area:hover { border-color: #07c160; color: #07c160; }
+.upload-area input { display: none; }
+.empty-files { text-align: center; color: #999; font-size: 14px; padding: 20px 0; }
+.reload-btn {
+  display: block; width: 100%; padding: 10px; margin-top: 12px;
+  background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 8px;
+  color: #666; font-size: 14px; cursor: pointer; text-align: center;
+}
+.reload-btn:hover { background: #ebebeb; }
+.toast {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  z-index: 300; background: rgba(0,0,0,0.75); color: white;
+  padding: 8px 20px; border-radius: 20px; font-size: 14px;
+  display: none; pointer-events: none;
+}
+.toast.show { display: block; animation: fadeIn 0.2s ease; }
+
+/* Responsive */
+@media (max-width: 400px) {
+  .bubble { max-width: 85%; font-size: 14px; }
+  .header h1 { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="headerTitle">老师助手</h1>
+  <div class="header-actions">
+    <button class="settings-btn" onclick="openSettings()">⚙️</button>
+    <button class="lang-btn" id="langToggle" onclick="toggleLang()">English</button>
+  </div>
+</div>
+
+<div class="chat-container" id="chatContainer">
+  <div class="welcome" id="welcome">
+    <div class="icon">👋</div>
+    <h2 id="welcomeTitle">您好！我是老师助手</h2>
+    <p id="welcomeText">
+      请提问您在教学工作中遇到的问题<br>
+      I'm here to help with your teaching questions
+    </p>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) closeSettings()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSettings()">×</button>
+    <h2 id="settingsTitle">📁 知识库管理</h2>
+    <div id="fileList"></div>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <div id="uploadLabel">+ 点击上传 .txt / .md 文件</div>
+      <input type="file" id="fileInput" accept=".txt,.md" onchange="uploadFile(event)">
+    </div>
+    <button class="reload-btn" onclick="reloadKB()" id="reloadBtn">🔄 重新加载知识库</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="input-area">
+  <input type="text" id="messageInput" placeholder="输入您的问题..." autocomplete="off" onkeydown="if(event.key==='Enter') send()">
+  <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
+</div>
+
+<script>
+let currentLang = localStorage.getItem('teacher_bot_lang') || 'zh';
+let sessionId = localStorage.getItem('teacher_bot_session') || '';
+let history = [];
+let isLoading = false;
+
+if (!sessionId) {
+  sessionId = Math.random().toString(36).substring(2, 10);
+  localStorage.setItem('teacher_bot_session', sessionId);
+}
+
+function t(zh, en) {
+  return currentLang === 'en' ? en : zh;
+}
+
+function updateUI() {
+  document.getElementById('headerTitle').textContent = t('老师助手', 'Teacher Assistant');
+  document.getElementById('langToggle').textContent = currentLang === 'zh' ? 'English' : '中文';
+  document.getElementById('messageInput').placeholder = t('输入您的问题...', 'Type your question...');
+  document.getElementById('welcomeTitle').textContent = t('您好！我是老师助手', 'Hello! I am Teacher Assistant');
+  document.getElementById('welcomeText').textContent = t(
+    '请提问您在教学工作中遇到的问题\nI\'m here to help with your teaching questions',
+    'I\'m here to help with your teaching questions\n请提问您在教学工作中遇到的问题'
+  );
+  localStorage.setItem('teacher_bot_lang', currentLang);
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  updateUI();
+  document.querySelectorAll('.lang-label').forEach(el => {
+    el.textContent = currentLang === 'zh' ? '💬 中文问答' : '💬 English Q&A';
+  });
+}
+
+function addMessage(content, role, sources) {
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+
+  const container = document.getElementById('chatContainer');
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+
+  let html = '<div class="bubble">' + content.replace(/\n/g, '<br>');
+  if (sources && role === 'bot') {
+    html += '<div class="source">' + sources + '</div>';
+  }
+  html += '</div>';
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function showTyping() {
+  const container = document.getElementById('chatContainer');
+  const div = document.createElement('div');
+  div.className = 'message bot';
+  div.id = 'typingIndicator';
+  div.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  container.appendChild(div);
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+async function send() {
+  const input = document.getElementById('messageInput');
+  const msg = input.value.trim();
+  if (!msg || isLoading) return;
+
+  input.value = '';
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  addMessage(msg, 'user');
+  showTyping();
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        message: msg,
+        language: currentLang,
+        history: history.slice(-10),
+      }),
+    });
+
+    const data = await res.json();
+    removeTyping();
+    addMessage(data.reply, 'bot');
+
+    history.push({ role: 'user', content: msg });
+    history.push({ role: 'assistant', content: data.reply });
+
+  } catch (err) {
+    removeTyping();
+    addMessage(
+      currentLang === 'en'
+        ? 'Network error, please check your connection and try again.'
+        : '网络错误，请检查连接后重试',
+      'bot'
+    );
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+async function fetchFiles() {
+  try {
+    const res = await fetch('/api/files');
+    const data = await res.json();
+    return data.files || [];
+  } catch { return []; }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  return (bytes / 1024).toFixed(1) + ' KB';
+}
+
+async function refreshFileList() {
+  const el = document.getElementById('fileList');
+  const files = await fetchFiles();
+  if (files.length === 0) {
+    el.innerHTML = '<div class="empty-files">暂无文件，请上传</div>';
+    return;
+  }
+  el.innerHTML = files.map(f => `
+    <div class="file-item">
+      <span class="file-name">📄 ${f.name}</span>
+      <span class="file-size">${formatSize(f.size)}</span>
+      <button class="file-del" onclick="deleteFile('${f.name}')">🗑</button>
+    </div>
+  `).join('');
+}
+
+async function openSettings() {
+  document.getElementById('settingsModal').classList.add('show');
+  await refreshFileList();
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+async function uploadFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const label = document.getElementById('uploadLabel');
+  label.textContent = t('正在上传...', 'Uploading...');
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || t('上传成功', 'Upload successful'));
+      await refreshFileList();
+    } else {
+      showToast(data.error || t('上传失败', 'Upload failed'));
+    }
+  } catch {
+    showToast(t('上传失败，请重试', 'Upload failed, please retry'));
+  }
+
+  label.textContent = '+ ' + t('点击上传 .txt / .md 文件', 'Click to upload .txt / .md files');
+  event.target.value = '';
+}
+
+async function deleteFile(name) {
+  if (!confirm(t(`确认删除 ${name}？`, `Delete ${name}?`))) return;
+  try {
+    const res = await fetch('/api/files/' + encodeURIComponent(name), { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || t('删除成功', 'Deleted'));
+      await refreshFileList();
+    } else {
+      showToast(data.error || t('删除失败', 'Delete failed'));
+    }
+  } catch {
+    showToast(t('删除失败', 'Delete failed'));
+  }
+}
+
+async function reloadKB() {
+  const btn = document.getElementById('reloadBtn');
+  btn.textContent = t('🔄 加载中...', '🔄 Loading...');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/reload', { method: 'POST' });
+    const data = await res.json();
+    showToast(t(`知识库已刷新，${data.documents} 个文档`, `KB reloaded, ${data.documents} documents`));
+  } catch {
+    showToast(t('刷新失败', 'Reload failed'));
+  }
+  btn.textContent = t('🔄 重新加载知识库', '🔄 Reload knowledge base');
+  btn.disabled = false;
+}
+
+updateUI();
+</script>
+</body>
+</html>
