@@ -344,6 +344,11 @@ function formatSize(bytes) {
   return (bytes / 1024).toFixed(1) + ' KB';
 }
 
+function clearPassword() {
+  adminPassword = '';
+  sessionStorage.removeItem('admin_pw');
+}
+
 async function refreshFileList() {
   const el = document.getElementById('fileList');
   try {
@@ -361,7 +366,8 @@ async function refreshFileList() {
     `).join('');
   } catch (err) {
     if (err.message === 'password') {
-      document.getElementById('fileList').innerHTML = '<div class="empty-files" style="color:#ff4d4f">密码错误，请刷新页面重试</div>';
+      clearPassword();
+      document.getElementById('fileList').innerHTML = '<div class="empty-files" style="color:#ff4d4f">密码错误，点击⚙️重新输入</div>';
     }
   }
 }
@@ -398,6 +404,7 @@ async function uploadFile(event) {
 
   try {
     const res = await fetch('/api/upload', { method: 'POST', body: form, headers: adminHeaders() });
+    if (res.status === 403) { clearPassword(); showToast(t('密码错误，请重试', 'Wrong password')); return; }
     const data = await res.json();
     if (res.ok) {
       showToast(data.message || t('上传成功', 'Upload successful'));
