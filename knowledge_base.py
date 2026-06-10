@@ -26,17 +26,23 @@ class KnowledgeBase:
             self.knowledge_dir.mkdir(parents=True, exist_ok=True)
             return docs
 
-        for file_path in self.knowledge_dir.glob("*"):
+        for file_path in sorted(self.knowledge_dir.glob("**/*")):
+            if not file_path.is_file():
+                continue
             if file_path.suffix.lower() not in [".md", ".txt"]:
                 continue
             try:
                 content = file_path.read_text(encoding="utf-8")
+                relative = file_path.relative_to(self.knowledge_dir)
+                category = relative.parent.name if relative.parent.name != "." else ""
                 docs.append({
                     "content": content,
                     "filename": file_path.name,
+                    "category": category,
                     "path": str(file_path),
                 })
-                logger.info(f"加载文档: {file_path.name}")
+                tag = f"[{category}] " if category else ""
+                logger.info(f"加载文档: {tag}{file_path.name}")
             except Exception as e:
                 logger.warning(f"读取文档失败 {file_path.name}: {e}")
         return docs
@@ -87,6 +93,7 @@ class KnowledgeBase:
                 self._chunks.append(chunk)
                 self._metadatas.append({
                     "filename": doc["filename"],
+                    "category": doc.get("category", ""),
                     "chunk_index": i,
                 })
 

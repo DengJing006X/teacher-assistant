@@ -140,6 +140,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
 }
 .upload-area:hover { border-color: #07c160; color: #07c160; }
 .upload-area input { display: none; }
+.cat-tab {
+  flex:1; padding:8px; border:1px solid #e0e0e0; background:#f9f9f9;
+  border-radius:8px; font-size:13px; cursor:pointer; color:#666;
+  transition:all 0.2s;
+}
+.cat-tab.active { background:#07c160; color:white; border-color:#07c160; }
+.cat-tab:hover:not(.active) { background:#eee; }
 .empty-files { text-align: center; color: #999; font-size: 14px; padding: 20px 0; }
 .reload-btn {
   display: block; width: 100%; padding: 10px; margin-top: 12px;
@@ -199,6 +206,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
   <div class="modal">
     <button class="modal-close" onclick="closeSettings()">×</button>
     <h2 id="settingsTitle">📁 知识库管理</h2>
+    <div style="display:flex;gap:4px;margin-bottom:12px" id="categoryTabs">
+      <button class="cat-tab active" data-cat="教学" onclick="switchCategory('教学')">教学</button>
+      <button class="cat-tab" data-cat="制度" onclick="switchCategory('制度')">制度</button>
+    </div>
     <div id="fileList"></div>
     <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
       <div id="uploadLabel">+ 点击上传 .txt / .md 文件</div>
@@ -330,6 +341,7 @@ async function send() {
   input.focus();
 }
 
+let currentCategory = '教学';
 let adminPassword = sessionStorage.getItem('admin_pw') || '';
 
 function showToast(msg) {
@@ -340,8 +352,28 @@ function showToast(msg) {
 }
 
 function apiUrl(path) {
-  const sep = path.includes('?') ? '&' : '?';
-  return adminPassword ? path + sep + 't=' + encodeURIComponent(adminPassword) : path;
+  let url = path;
+  const sep = url.includes('?') ? '&' : '?';
+  if (adminPassword) url += sep + 't=' + encodeURIComponent(adminPassword);
+  return url;
+}
+
+function apiUrlWithCat(path) {
+  let url = apiUrl(path);
+  if (currentCategory) {
+    url += (url.includes('?') ? '&' : '?') + 'category=' + encodeURIComponent(currentCategory);
+  }
+  return url;
+}
+
+function switchCategory(cat) {
+  currentCategory = cat;
+  document.querySelectorAll('.cat-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  const label = document.getElementById('uploadLabel');
+  label.textContent = '+ ' + t('上传到' + cat, 'Upload to ' + cat);
+  refreshFileList();
 }
 
 async function fetchFiles() {
@@ -364,12 +396,17 @@ function clearPassword() {
 async function refreshFileList() {
   const el = document.getElementById('fileList');
   try {
-    const files = await fetchFiles();
-    if (files.length === 0) {
+    const allFiles = await fetchFiles();
+    const filtered = allFiles.filter(f => f.category === currentCategory);
+    if (allFiles.length === 0) {
       el.innerHTML = '<div class="empty-files">暂无文件，请上传</div>';
       return;
     }
-    el.innerHTML = files.map(f => `
+    if (filtered.length === 0) {
+      el.innerHTML = '<div class="empty-files">该类目暂无文件</div>';
+      return;
+    }
+    el.innerHTML = filtered.map(f => `
       <div class="file-item">
         <span class="file-name">📄 ${f.name}</span>
         <span class="file-size">${formatSize(f.size)}</span>
@@ -379,7 +416,7 @@ async function refreshFileList() {
   } catch (err) {
     if (err.message === 'password') {
       clearPassword();
-      document.getElementById('fileList').innerHTML = '<div class="empty-files" style="color:#ff4d4f">密码错误，点击⚙️重新输入</div>';
+      el.innerHTML = '<div class="empty-files" style="color:#ff4d4f">密码错误，点击⚙️重新输入</div>';
     }
   }
 }
@@ -392,6 +429,7 @@ async function openSettings() {
     return;
   }
   document.getElementById('settingsModal').classList.add('show');
+  document.getElementById('uploadLabel').textContent = '+ ' + t('上传到' + currentCategory, 'Upload to ' + currentCategory);
   await refreshFileList();
 }
 
@@ -410,6 +448,7 @@ async function submitPassword() {
       sessionStorage.setItem('admin_pw', pw);
       document.getElementById('pwOverlay').classList.remove('show');
       document.getElementById('settingsModal').classList.add('show');
+      document.getElementById('uploadLabel').textContent = '+ ' + t('上传到' + currentCategory, 'Upload to ' + currentCategory);
       await refreshFileList();
     } else {
       document.getElementById('pwError').textContent = t('密码错误', 'Wrong password');
@@ -434,7 +473,7 @@ async function uploadFile(event) {
   form.append('file', file);
 
   try {
-    const res = await fetch(apiUrl('/api/upload'), { method: 'POST', body: form });
+    const res = await fetch(apiUrlWithCat('/api/upload'), { method: 'POST', body: form });
     if (res.status === 403) { clearPassword(); showToast(t('密码错误，请重试', 'Wrong password')); return; }
     const data = await res.json();
     if (res.ok) {
@@ -447,14 +486,15 @@ async function uploadFile(event) {
     showToast(t('上传失败，请重试', 'Upload failed, please retry'));
   }
 
-  label.textContent = '+ ' + t('点击上传 .txt / .md 文件', 'Click to upload .txt / .md files');
+  const catName = currentCategory || '';
+  label.textContent = '+ ' + t('上传到' + catName, 'Upload to ' + catName);
   event.target.value = '';
 }
 
 async function deleteFile(name) {
   if (!confirm(t(`确认删除 ${name}？`, `Delete ${name}?`))) return;
   try {
-    const res = await fetch(apiUrl('/api/files/' + encodeURIComponent(name)), { method: 'DELETE' });
+    const res = await fetch(apiUrlWithCat('/api/files/' + encodeURIComponent(name)), { method: 'DELETE' });
     const data = await res.json();
     if (res.ok) {
       showToast(data.message || t('删除成功', 'Deleted'));

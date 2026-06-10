@@ -205,17 +205,23 @@ async def list_files(t: str = ""):
     knowdir = app_config.KNOWLEDGE_DIR
     knowdir.mkdir(parents=True, exist_ok=True)
     files = []
-    for f in sorted(knowdir.glob("*")):
-        if f.suffix.lower() in (".txt", ".md"):
-            files.append({
-                "name": f.name,
-                "size": f.stat().st_size,
-            })
+    for f in sorted(knowdir.glob("**/*")):
+        if not f.is_file():
+            continue
+        if f.suffix.lower() not in (".txt", ".md"):
+            continue
+        relative = f.relative_to(knowdir)
+        category = relative.parent.name if relative.parent.name != "." else ""
+        files.append({
+            "name": f.name,
+            "size": f.stat().st_size,
+            "category": category,
+        })
     return {"files": files}
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), t: str = ""):
+async def upload_file(file: UploadFile = File(...), t: str = "", category: str = ""):
     """上传知识库文件"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
@@ -228,6 +234,10 @@ async def upload_file(file: UploadFile = File(...), t: str = ""):
             content={"error": "仅支持 .txt 和 .md 文件"},
         )
 
+    if category:
+        knowdir = knowdir / category
+        knowdir.mkdir(parents=True, exist_ok=True)
+
     filepath = knowdir / file.filename
     content = await file.read()
     filepath.write_bytes(content)
@@ -235,7 +245,8 @@ async def upload_file(file: UploadFile = File(...), t: str = ""):
     reload_knowledge_base()
 
     doc_count = kb.get_document_count()
-    logger.info(f"文件 {file.filename} 上传成功，共 {doc_count} 个文档")
+    tag = f"[{category}] " if category else ""
+    logger.info(f"文件 {tag}{file.filename} 上传成功，共 {doc_count} 个文档")
     return {
         "message": f"{file.filename} 上传成功",
         "documents": doc_count,
@@ -243,13 +254,16 @@ async def upload_file(file: UploadFile = File(...), t: str = ""):
 
 
 @app.delete("/api/files/{filename}")
-async def delete_file(filename: str, t: str = ""):
+async def delete_file(filename: str, t: str = "", category: str = ""):
     """删除知识库中的文件"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
     import urllib.parse
     filename = urllib.parse.unquote(filename)
-    filepath = app_config.KNOWLEDGE_DIR / filename
+    knowdir = app_config.KNOWLEDGE_DIR
+    if category:
+        knowdir = knowdir / category
+    filepath = knowdir / filename
 
     if not filepath.exists():
         return JSONResponse(
@@ -261,7 +275,8 @@ async def delete_file(filename: str, t: str = ""):
     reload_knowledge_base()
 
     doc_count = kb.get_document_count()
-    logger.info(f"文件 {filename} 已删除，共 {doc_count} 个文档")
+    tag = f"[{category}] " if category else ""
+    logger.info(f"文件 {tag}{filename} 已删除，共 {doc_count} 个文档")
     return {
         "message": f"{filename} 已删除",
         "documents": doc_count,
