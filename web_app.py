@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("web_app")
 
-from fastapi import FastAPI, Request, UploadFile, File, Header
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -179,15 +179,13 @@ async def health():
 # 管理员验证
 # ============================================================
 
-def check_admin(x_admin_password: str = Header(None)):
-    if x_admin_password != app_config.ADMIN_PASSWORD:
-        return False
-    return True
+class PasswordBody(BaseModel):
+    password: str
 
 
 @app.post("/api/verify-password")
-async def verify_password(x_admin_password: str = Header(None)):
-    if x_admin_password == app_config.ADMIN_PASSWORD:
+async def verify_password(body: PasswordBody):
+    if body.password == app_config.ADMIN_PASSWORD:
         return {"ok": True}
     return JSONResponse(status_code=403, content={"error": "密码错误"})
 
@@ -197,9 +195,9 @@ async def verify_password(x_admin_password: str = Header(None)):
 # ============================================================
 
 @app.get("/api/files")
-async def list_files(x_admin_password: str = Header(None)):
+async def list_files(t: str = ""):
     """列出知识库中的所有文件"""
-    if x_admin_password != app_config.ADMIN_PASSWORD:
+    if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
     knowdir = app_config.KNOWLEDGE_DIR
     knowdir.mkdir(parents=True, exist_ok=True)
@@ -214,9 +212,9 @@ async def list_files(x_admin_password: str = Header(None)):
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), x_admin_password: str = Header(None)):
+async def upload_file(file: UploadFile = File(...), t: str = ""):
     """上传知识库文件"""
-    if x_admin_password != app_config.ADMIN_PASSWORD:
+    if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
     knowdir = app_config.KNOWLEDGE_DIR
     knowdir.mkdir(parents=True, exist_ok=True)
@@ -242,9 +240,9 @@ async def upload_file(file: UploadFile = File(...), x_admin_password: str = Head
 
 
 @app.delete("/api/files/{filename}")
-async def delete_file(filename: str, x_admin_password: str = Header(None)):
+async def delete_file(filename: str, t: str = ""):
     """删除知识库中的文件"""
-    if x_admin_password != app_config.ADMIN_PASSWORD:
+    if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
     import urllib.parse
     filename = urllib.parse.unquote(filename)
@@ -268,9 +266,9 @@ async def delete_file(filename: str, x_admin_password: str = Header(None)):
 
 
 @app.post("/api/reload")
-async def reload_kb(x_admin_password: str = Header(None)):
+async def reload_kb(t: str = ""):
     """手动重新加载知识库"""
-    if x_admin_password != app_config.ADMIN_PASSWORD:
+    if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
     reload_knowledge_base()
     doc_count = kb.get_document_count()
