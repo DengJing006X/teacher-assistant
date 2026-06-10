@@ -319,6 +319,8 @@ async function send() {
   input.focus();
 }
 
+let adminPassword = sessionStorage.getItem('admin_pw') || '';
+
 function showToast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -326,12 +328,15 @@ function showToast(msg) {
   setTimeout(() => el.classList.remove('show'), 2500);
 }
 
+function adminHeaders() {
+  return { 'X-Admin-Password': adminPassword };
+}
+
 async function fetchFiles() {
-  try {
-    const res = await fetch('/api/files');
-    const data = await res.json();
-    return data.files || [];
-  } catch { return []; }
+  const res = await fetch('/api/files', { headers: adminHeaders() });
+  if (res.status === 403) throw new Error('password');
+  const data = await res.json();
+  return data.files || [];
 }
 
 function formatSize(bytes) {
@@ -341,21 +346,38 @@ function formatSize(bytes) {
 
 async function refreshFileList() {
   const el = document.getElementById('fileList');
-  const files = await fetchFiles();
-  if (files.length === 0) {
-    el.innerHTML = '<div class="empty-files">暂无文件，请上传</div>';
-    return;
+  try {
+    const files = await fetchFiles();
+    if (files.length === 0) {
+      el.innerHTML = '<div class="empty-files">暂无文件，请上传</div>';
+      return;
+    }
+    el.innerHTML = files.map(f => `
+      <div class="file-item">
+        <span class="file-name">📄 ${f.name}</span>
+        <span class="file-size">${formatSize(f.size)}</span>
+        <button class="file-del" onclick="deleteFile('${f.name}')">🗑</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    if (err.message === 'password') {
+      document.getElementById('fileList').innerHTML = '<div class="empty-files" style="color:#ff4d4f">密码错误，请刷新页面重试</div>';
+    }
   }
-  el.innerHTML = files.map(f => `
-    <div class="file-item">
-      <span class="file-name">📄 ${f.name}</span>
-      <span class="file-size">${formatSize(f.size)}</span>
-      <button class="file-del" onclick="deleteFile('${f.name}')">🗑</button>
-    </div>
-  `).join('');
 }
 
 async function openSettings() {
+  if (!adminPassword) {
+    const pw = prompt(t('请输入管理密码', 'Enter admin password'));
+    if (!pw) return;
+    const res = await fetch('/api/verify-password', { headers: { 'X-Admin-Password': pw } });
+    if (!res.ok) {
+      showToast(t('密码错误', 'Wrong password'));
+      return;
+    }
+    adminPassword = pw;
+    sessionStorage.setItem('admin_pw', pw);
+  }
   document.getElementById('settingsModal').classList.add('show');
   await refreshFileList();
 }
@@ -375,7 +397,7 @@ async function uploadFile(event) {
   form.append('file', file);
 
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const res = await fetch('/api/upload', { method: 'POST', body: form, headers: adminHeaders() });
     const data = await res.json();
     if (res.ok) {
       showToast(data.message || t('上传成功', 'Upload successful'));
@@ -394,7 +416,7 @@ async function uploadFile(event) {
 async function deleteFile(name) {
   if (!confirm(t(`确认删除 ${name}？`, `Delete ${name}?`))) return;
   try {
-    const res = await fetch('/api/files/' + encodeURIComponent(name), { method: 'DELETE' });
+    const res = await fetch('/api/files/' + encodeURIComponent(name), { method: 'DELETE', headers: adminHeaders() });
     const data = await res.json();
     if (res.ok) {
       showToast(data.message || t('删除成功', 'Deleted'));
@@ -412,7 +434,7 @@ async function reloadKB() {
   btn.textContent = t('🔄 加载中...', '🔄 Loading...');
   btn.disabled = true;
   try {
-    const res = await fetch('/api/reload', { method: 'POST' });
+    const res = await fetch('/api/reload', { method: 'POST', headers: adminHeaders() });
     const data = await res.json();
     showToast(t(`知识库已刷新，${data.documents} 个文档`, `KB reloaded, ${data.documents} documents`));
   } catch {
