@@ -82,6 +82,12 @@ Current question: {question}
 ADMIN_PASSWORD = "WH0804"
 
 # ============================================================
+# 回复免责声明（显示在每条回复最前面）
+# ============================================================
+DISCLAIMER_ZH = "小助手刚上岗，回复仅供参考，有疑问欢迎联系上级和阿九~"
+DISCLAIMER_EN = "Disclaimer: This AI assistant is new, answers are for reference only. Please contact your supervisor for confirmation."
+
+# ============================================================
 # 日志设置
 # ============================================================
 LOG_LEVEL = "INFO"

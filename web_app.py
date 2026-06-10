@@ -149,6 +149,9 @@ async def chat(req: ChatRequest):
             else "Sorry, AI is unavailable. Please try again later."
         )
 
+    disclaimer = app_config.DISCLAIMER_ZH if lang == "zh" else app_config.DISCLAIMER_EN
+    answer = f"{disclaimer}\n\n{answer}"
+
     logger.info(f"[{session_id}] 回答: {answer[:80]}...")
     return ChatResponse(
         session_id=session_id,
