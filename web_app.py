@@ -124,23 +124,25 @@ async def chat(req: ChatRequest):
     logger.info(f"[{session_id}] ({lang}) 提问: {question}")
 
     # 知识库检索
-    results = kb.search(question)
-    if results:
-        context = "\n\n---\n\n".join(
-            f"[来自: {f}]\n{c}" for c, _, f in results
-        )
-        logger.info(f"检索到 {len(results)} 个相关片段")
-    elif lang == "en":
-        # 英文提问中文文档时，把知识库全文传给 AI 自行跨语言理解
+    if lang == "en":
+        # 英文提问时，直接把全部知识传给 AI 自行跨语言理解
         all_chunks = kb.get_all_chunks()
         if all_chunks:
             context = "\n\n---\n\n".join(
                 f"[来自: {f}]\n{c}" for c, _, f in all_chunks
             )
+            logger.info(f"英文查询，传递全部 {len(all_chunks)} 个文本片段给 AI")
         else:
             context = ""
     else:
-        context = ""
+        results = kb.search(question)
+        if results:
+            context = "\n\n---\n\n".join(
+                f"[来自: {f}]\n{c}" for c, _, f in results
+            )
+            logger.info(f"检索到 {len(results)} 个相关片段")
+        else:
+            context = ""
 
     # AI 回答
     try:
@@ -180,9 +182,11 @@ async def health():
         status = "error"
         issues.append("AI模型未初始化")
     doc_count = kb.get_document_count() if kb else 0
+    chunk_count = kb.get_chunk_count() if kb else 0
     return {
         "status": status,
         "documents": doc_count,
+        "chunks": chunk_count,
         "issues": issues,
     }
 
