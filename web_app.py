@@ -130,6 +130,15 @@ async def chat(req: ChatRequest):
             f"[来自: {f}]\n{c}" for c, _, f in results
         )
         logger.info(f"检索到 {len(results)} 个相关片段")
+    elif lang == "en":
+        # 英文提问中文文档时，把知识库全文传给 AI 自行跨语言理解
+        all_chunks = kb.get_all_chunks()
+        if all_chunks:
+            context = "\n\n---\n\n".join(
+                f"[来自: {f}]\n{c}" for c, _, f in all_chunks
+            )
+        else:
+            context = ""
     else:
         context = ""
 

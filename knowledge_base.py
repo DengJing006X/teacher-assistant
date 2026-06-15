@@ -163,3 +163,8 @@ class KnowledgeBase:
 
     def get_chunk_count(self) -> int:
         return len(self._chunks)
+
+    def get_all_chunks(self) -> List[Tuple[str, float, str]]:
+        if not self._chunks:
+            return []
+        return [(self._chunks[i], 0.0, self._metadatas[i]["filename"]) for i in range(len(self._chunks))]
