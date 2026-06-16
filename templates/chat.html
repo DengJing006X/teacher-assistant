@@ -207,7 +207,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
     <button class="modal-close" onclick="closeSettings()">×</button>
     <h2 id="settingsTitle">📁 知识库管理</h2>
     <div style="display:flex;gap:4px;margin-bottom:12px" id="categoryTabs">
-      <button class="cat-tab active" data-cat="教学" onclick="switchCategory('教学')">教学</button>
+      <button class="cat-tab active" data-cat="培训" onclick="switchCategory('培训')">培训</button>
+      <button class="cat-tab" data-cat="教学" onclick="switchCategory('教学')">教学</button>
       <button class="cat-tab" data-cat="制度" onclick="switchCategory('制度')">制度</button>
     </div>
     <div id="fileList"></div>
@@ -341,7 +342,7 @@ async function send() {
   input.focus();
 }
 
-let currentCategory = '教学';
+let currentCategory = '培训';
 let adminPassword = sessionStorage.getItem('admin_pw') || '';
 
 function showToast(msg) {
