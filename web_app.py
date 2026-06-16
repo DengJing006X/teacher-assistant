@@ -142,7 +142,15 @@ async def chat(req: ChatRequest):
             )
             logger.info(f"检索到 {len(results)} 个相关片段")
         else:
-            context = ""
+            # 搜索无结果时，传递全文给 AI 自行查找
+            all_chunks = kb.get_all_chunks()
+            if all_chunks:
+                context = "\n\n---\n\n".join(
+                    f"[来自: {f}]\n{c}" for c, _, f in all_chunks
+                )
+                logger.info(f"搜索无结果，传递全部 {len(all_chunks)} 个文本片段给 AI")
+            else:
+                context = ""
 
     # AI 回答
     try:
