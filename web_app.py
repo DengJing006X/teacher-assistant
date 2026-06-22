@@ -51,6 +51,33 @@ class PasswordBody(BaseModel):
     password: str
 
 
+def format_fallback_answer(question: str, results: list, language: str) -> str:
+    top_chunks = [chunk for chunk, _, _ in results[:3]]
+    top_files = []
+    for _, _, filename in results[:3]:
+        if filename not in top_files:
+            top_files.append(filename)
+
+    if language == "en":
+        intro = "The AI service is temporarily unavailable. Based on the current approved knowledge, here is a fallback answer for reference."
+        conclusion = f"Conclusion:\nYour question is related to the currently loaded knowledge base: {question}"
+        steps = "Steps:\n1. Follow the relevant process described below.\n2. If your case needs approval or judgment, contact your supervisor.\n3. If the information is still insufficient, use the manual escalation path."
+        materials = "Materials:\n1. Keep screenshots, class time, class name, and a short explanation if relevant.\n2. Prepare any records mentioned below before contacting a supervisor."
+        reminder = "Reminder:\nThis is a fallback answer generated without the model. If the issue involves approval, penalties, performance, or case judgment, please confirm with the responsible owner."
+        knowledge = "Relevant knowledge excerpts:\n" + "\n\n".join(top_chunks)
+        sources = "Sources:\n- " + "\n- ".join(top_files)
+        return "\n\n".join([intro, conclusion, steps, materials, reminder, knowledge, sources])
+
+    intro = "AI 服务暂时不可用。基于当前已确认知识，我先给你一版兜底参考答案。"
+    conclusion = f"结论：\n你这个问题与当前知识库已有内容相关，建议先按下面的流程处理。"
+    steps = "流程：\n1. 先参考下方匹配到的知识内容执行。\n2. 如果涉及审批、判责或个案判断，及时联系直属负责人确认。\n3. 如果下方信息仍不足以覆盖你的场景，走人工确认。"
+    materials = "材料：\n1. 如涉及课程问题，请保留课程时间、班级、截图和情况说明。\n2. 如涉及流程问题，请准备需要提交的基础信息和记录。"
+    reminder = "提醒：\n这是一版无模型兜底答案，不代表最终审批或判定结论；涉及绩效、处罚、申诉、审批结果等内容，仍需负责人确认。"
+    knowledge = "匹配到的知识内容：\n" + "\n\n".join(top_chunks)
+    sources = "来源文件：\n- " + "\n- ".join(top_files)
+    return "\n\n".join([intro, conclusion, steps, materials, reminder, knowledge, sources])
+
+
 def is_sensitive_question(question: str) -> bool:
     lowered = question.lower()
     for keyword in app_config.SENSITIVE_KEYWORDS:
@@ -148,7 +175,7 @@ async def chat(req: ChatRequest):
         )
     except Exception as e:
         logger.error("Answer generation failed: %s", e)
-        answer = "抱歉，AI 服务暂时不可用，请稍后再试。" if lang == "zh" else "Sorry, the AI service is temporarily unavailable. Please try again later."
+        answer = format_fallback_answer(question, results, lang)
 
     disclaimer = app_config.DISCLAIMER_ZH if lang == "zh" else app_config.DISCLAIMER_EN
     answer = f"{disclaimer}\n\n{answer}"

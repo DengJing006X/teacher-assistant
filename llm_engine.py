@@ -73,9 +73,7 @@ class LLMEngine:
             return answer
         except Exception as e:
             logger.error("LLM call failed: %s", e)
-            if language == "en":
-                return "Sorry, the AI service is temporarily unavailable. Please try again later."
-            return "抱歉，AI 服务暂时不可用，请稍后再试。"
+            raise RuntimeError("LLM_UNAVAILABLE") from e
 
     def check_connection(self) -> tuple:
         try:
