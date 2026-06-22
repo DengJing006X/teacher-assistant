@@ -27,6 +27,17 @@ class KnowledgeBase:
             return True
         return category in self.config.ALLOWED_KNOWLEDGE_CATEGORIES
 
+    def _is_allowed_file(self, file_path: Path) -> bool:
+        name = file_path.name.lower()
+        blocked_keywords = [
+            "测试版可上线知识清单",
+            "测试版不可上线知识清单",
+            "测试版统一回答模板",
+            "测试版未命中话术",
+            "测试版敏感问题拦截话术",
+        ]
+        return not any(keyword.lower() in name for keyword in blocked_keywords)
+
     def _load_documents(self) -> List[dict]:
         docs = []
         if not self.knowledge_dir.exists():
@@ -43,6 +54,9 @@ class KnowledgeBase:
             category = relative.parent.name if relative.parent.name != "." else ""
             if not self._is_allowed_category(category):
                 logger.info("Skip out-of-scope file: %s", file_path.name)
+                continue
+            if not self._is_allowed_file(file_path):
+                logger.info("Skip helper or template file: %s", file_path.name)
                 continue
 
             try:
