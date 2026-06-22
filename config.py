@@ -78,7 +78,7 @@ TEST_SCOPE_NOTICE_EN = (
 )
 
 UNHIT_REPLY_ZH = (
-    "这个问题当前知识库还没有可直接回答的已确认答案，我先帮你记录为待补充问题。\n"
+    "这个问题当前知识库里还没有可直接回答的已确认答案，我先帮你记为待补充问题。\n"
     "如果比较紧急，请先联系直属负责人或对应教务/职能负责人处理。"
 )
 UNHIT_REPLY_EN = (
@@ -88,7 +88,7 @@ UNHIT_REPLY_EN = (
 
 SENSITIVE_REPLY_ZH = (
     "这个问题涉及敏感信息、审批结果或个案判断，我暂时不能直接给最终结论。\n"
-    "建议你同步直属负责人或对应负责人确认；如果你愿意，我可以先帮你整理需要说明的材料。"
+    "请联系直属负责人或对应负责人确认；如果你愿意，我可以先帮你整理需要说明的材料。"
 )
 SENSITIVE_REPLY_EN = (
     "This question involves sensitive information, approval outcomes, or case-by-case judgment, so I cannot provide a final conclusion directly.\n"
@@ -100,15 +100,11 @@ SENSITIVE_REPLY_EN = (
 # Prompts
 # ============================================================
 BOT_PROMPT_ZH = """你是“老师小助手”测试版，只能根据给定知识回答问题。
+【测试范围】{scope_notice}
 
-【测试范围】
-{scope_notice}
+【知识库内容】{context}
 
-【知识库内容】
-{context}
-
-【用户问题】
-{question}
+【用户问题】{question}
 
 请严格遵守：
 1. 只能基于给定知识回答，不得补充未给出的制度、结论或承诺。
@@ -116,6 +112,7 @@ BOT_PROMPT_ZH = """你是“老师小助手”测试版，只能根据给定知�
 3. 不要让用户自己去找文档。
 4. 不要回答薪酬、绩效、处罚、审批结果、申诉结果、内部链接、后台表格。
 5. 如果上下文不足以支持回答，直接返回：{unhit_reply}
+6. 回答保持简短，优先直接解决问题，不要重复整段知识原文。
 """
 
 BOT_PROMPT_EN = """You are the test version of "Teacher Assistant" and may only answer from the provided knowledge.
@@ -138,6 +135,7 @@ Rules:
 3. Do not tell the user to search documents by themselves.
 4. Do not answer payroll, performance, penalties, approval outcomes, appeal outcomes, internal links, or internal records.
 5. If the context is insufficient, return exactly: {unhit_reply}
+6. Keep the answer concise and avoid dumping the full source text.
 """
 
 

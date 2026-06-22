@@ -4,6 +4,7 @@ Teacher Assistant - H5 test version
 
 import logging
 import sys
+import urllib.parse
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -51,44 +52,106 @@ class PasswordBody(BaseModel):
     password: str
 
 
+def extract_direct_answer(text: str, question: str) -> str:
+    lines = text.splitlines()
+    normalized_question = question.replace("？", "").replace("?", "").strip()
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("## ") and normalized_question in stripped.replace("？", "").replace("?", ""):
+            section = [stripped]
+            for next_line in lines[idx + 1:]:
+                if next_line.strip().startswith("## "):
+                    break
+                section.append(next_line.rstrip())
+            return "\n".join(section).strip()
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            section = [stripped]
+            for next_line in lines[idx + 1:]:
+                if next_line.strip().startswith("## "):
+                    break
+                section.append(next_line.rstrip())
+            return "\n".join(section).strip()
+
+    return text.strip()
+
+
+def shorten_answer_block(text: str) -> str:
+    lines = [line.rstrip() for line in text.splitlines()]
+    kept = []
+    current_section = None
+    section_counts = {
+        "流程": 0,
+        "材料": 0,
+        "提醒": 0,
+    }
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if kept and kept[-1] != "":
+                kept.append("")
+            continue
+
+        if stripped.startswith("## "):
+            title = stripped[3:].strip()
+            if title.startswith("临时不能上课怎么办") or title.startswith("被排了非工作时间段课程") or title.startswith("学员考勤状态点错了"):
+                kept.append(f"问题：{title}")
+            continue
+
+        if stripped.startswith("**结论：**") or stripped == "结论：":
+            current_section = "结论"
+            kept.append("结论：")
+            continue
+        if stripped.startswith("**流程：**") or stripped == "流程：":
+            current_section = "流程"
+            kept.append("流程：")
+            continue
+        if stripped.startswith("**材料：**") or stripped == "材料：":
+            current_section = "材料"
+            kept.append("材料：")
+            continue
+        if stripped.startswith("**提醒：**") or stripped == "提醒：":
+            current_section = "提醒"
+            kept.append("提醒：")
+            continue
+
+        if current_section == "结论":
+            if not kept or kept[-1] == "结论：":
+                kept.append(stripped.replace("**", ""))
+            continue
+
+        if current_section in ("流程", "材料"):
+            if stripped[:2].isdigit() or (len(stripped) > 1 and stripped[0].isdigit() and stripped[1] == "."):
+                if section_counts[current_section] < 3:
+                    kept.append(stripped.replace("**", ""))
+                    section_counts[current_section] += 1
+            continue
+
+        if current_section == "提醒":
+            if section_counts["提醒"] < 2:
+                kept.append(stripped.replace("**", ""))
+                section_counts["提醒"] += 1
+            continue
+
+    compact = "\n".join(line for line in kept if line is not None).strip()
+    if len(compact) > 700:
+        compact = compact[:700].rstrip()
+    return compact
+
+
 def format_fallback_answer(question: str, results: list, language: str) -> str:
-    top_chunk, _, top_file = results[0]
-
-    def extract_relevant_section(text: str) -> str:
-        lines = text.splitlines()
-        for idx, line in enumerate(lines):
-            stripped = line.strip()
-            if stripped.startswith("## ") and question.replace("？", "").replace("?", "").strip() in stripped:
-                end = len(lines)
-                for j in range(idx + 1, len(lines)):
-                    if lines[j].strip().startswith("## "):
-                        end = j
-                        break
-                return "\n".join(lines[idx:end]).strip()
-        return text.strip()
-
-    relevant_text = extract_relevant_section(top_chunk)
-    if len(relevant_text) > 1600:
-        relevant_text = relevant_text[:1600].rstrip() + "\n\n（以下内容省略，测试版已截断显示）"
+    top_chunk, _, _ = results[0]
+    section = extract_direct_answer(top_chunk, question)
+    short_answer = shorten_answer_block(section)
 
     if language == "en":
-        intro = "The AI service is temporarily unavailable. Based on the current approved knowledge, here is a fallback answer for reference."
-        conclusion = "Conclusion:\nThe following approved knowledge is the closest match to your question."
-        steps = "Steps:\n1. Follow the relevant process described below.\n2. If your case needs approval or judgment, contact your supervisor.\n3. If the information is still insufficient, use the manual escalation path."
-        materials = "Materials:\n1. Keep screenshots, class time, class name, and a short explanation if relevant.\n2. Prepare any records mentioned below before contacting a supervisor."
-        reminder = "Reminder:\nThis is a fallback answer generated without the model. If the issue involves approval, penalties, performance, or case judgment, please confirm with the responsible owner."
-        knowledge = "Relevant knowledge:\n" + relevant_text
-        sources = "Source:\n- " + top_file
-        return "\n\n".join([intro, conclusion, steps, materials, reminder, knowledge, sources])
+        return "The AI service is temporarily unavailable. Here is the closest confirmed answer:\n\n" + short_answer
 
-    intro = "AI 服务暂时不可用。基于当前已确认知识，我先给你一版兜底参考答案。"
-    conclusion = "结论：\n我找到了与你问题最相关的一条已确认知识，建议先按下面内容处理。"
-    steps = "流程：\n1. 先参考下方匹配到的知识内容执行。\n2. 如果涉及审批、判责或个案判断，及时联系直属负责人确认。\n3. 如果下方信息仍不足以覆盖你的场景，走人工确认。"
-    materials = "材料：\n1. 如涉及课程问题，请保留课程时间、班级、截图和情况说明。\n2. 如涉及流程问题，请准备需要提交的基础信息和记录。"
-    reminder = "提醒：\n这是一版无模型兜底答案，不代表最终审批或判定结论；涉及绩效、处罚、申诉、审批结果等内容，仍需负责人确认。"
-    knowledge = "匹配到的知识内容：\n" + relevant_text
-    sources = "来源文件：\n- " + top_file
-    return "\n\n".join([intro, conclusion, steps, materials, reminder, knowledge, sources])
+    return "AI 服务暂时不可用。先给你当前知识库里最接近的一版直接答案：\n\n" + short_answer
 
 
 def is_sensitive_question(question: str) -> bool:
@@ -251,8 +314,6 @@ async def delete_file(filename: str, t: str = "", category: str = ""):
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
 
-    import urllib.parse
-
     decoded = urllib.parse.unquote(filename)
     knowdir = app_config.KNOWLEDGE_DIR
     if category:
@@ -260,30 +321,12 @@ async def delete_file(filename: str, t: str = "", category: str = ""):
     filepath = knowdir / decoded
 
     if not filepath.exists():
-        return JSONResponse(status_code=404, content={"error": f"文件 {decoded} 不存在"})
+        return JSONResponse(status_code=404, content={"error": "文件不存在"})
 
     filepath.unlink()
     reload_knowledge_base()
-    return {"message": f"{decoded} 已删除", "documents": kb.get_document_count()}
-
-
-@app.post("/api/reload")
-async def reload_kb(t: str = ""):
-    if t != app_config.ADMIN_PASSWORD:
-        return JSONResponse(status_code=403, content={"error": "密码错误"})
-
-    reload_knowledge_base()
-    return {"message": "知识库已重新加载", "documents": kb.get_document_count()}
-
-
-def main():
-    uvicorn.run(
-        app,
-        host=app_config.WEB_HOST,
-        port=app_config.WEB_PORT,
-        log_level="info",
-    )
+    return {"message": f"{decoded} 删除成功", "documents": kb.get_document_count()}
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run("web_app:app", host=app_config.WEB_HOST, port=app_config.WEB_PORT, reload=False)

@@ -35,8 +35,15 @@ class KnowledgeBase:
             "测试版统一回答模板",
             "测试版未命中话术",
             "测试版敏感问题拦截话术",
+            "readme",
+            "skill",
+            "status",
+            "缺口",
+            "样例",
+            "规范",
+            "说明",
         ]
-        return not any(keyword.lower() in name for keyword in blocked_keywords)
+        return not any(keyword in name for keyword in blocked_keywords)
 
     def _load_documents(self) -> List[dict]:
         docs = []
