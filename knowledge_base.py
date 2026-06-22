@@ -1,11 +1,13 @@
 """
-知识库引擎 - 使用 TF-IDF 关键词检索（无需下载模型，完全离线）
+Knowledge base engine for the H5 test version.
+Only loads allowed categories for the current test scope.
 """
 
 import logging
 import re
 from pathlib import Path
 from typing import List, Tuple
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,11 @@ class KnowledgeBase:
         self._chunks = []
         self._metadatas = []
 
+    def _is_allowed_category(self, category: str) -> bool:
+        if not self.config.TEST_MODE:
+            return True
+        return category in self.config.ALLOWED_KNOWLEDGE_CATEGORIES
+
     def _load_documents(self) -> List[dict]:
         docs = []
         if not self.knowledge_dir.exists():
@@ -31,20 +38,24 @@ class KnowledgeBase:
                 continue
             if file_path.suffix.lower() not in [".md", ".txt"]:
                 continue
+
+            relative = file_path.relative_to(self.knowledge_dir)
+            category = relative.parent.name if relative.parent.name != "." else ""
+            if not self._is_allowed_category(category):
+                logger.info("Skip out-of-scope file: %s", file_path.name)
+                continue
+
             try:
                 content = file_path.read_text(encoding="utf-8")
-                relative = file_path.relative_to(self.knowledge_dir)
-                category = relative.parent.name if relative.parent.name != "." else ""
                 docs.append({
                     "content": content,
                     "filename": file_path.name,
                     "category": category,
                     "path": str(file_path),
                 })
-                tag = f"[{category}] " if category else ""
-                logger.info(f"加载文档: {tag}{file_path.name}")
+                logger.info("Loaded file: [%s] %s", category, file_path.name)
             except Exception as e:
-                logger.warning(f"读取文档失败 {file_path.name}: {e}")
+                logger.warning("Failed to read file %s: %s", file_path.name, e)
         return docs
 
     def _split_text(self, text: str) -> List[str]:
@@ -56,6 +67,7 @@ class KnowledgeBase:
             para = para.strip()
             if not para:
                 continue
+
             if len(current) + len(para) < self.config.CHUNK_SIZE:
                 current += para + "\n\n"
             else:
@@ -72,20 +84,20 @@ class KnowledgeBase:
         return chunks
 
     def initialize(self):
-        """初始化知识库（使用 TF-IDF，无需下载模型）"""
         from sklearn.feature_extraction.text import TfidfVectorizer
         import jieba
 
-        logger.info("正在初始化知识库...")
+        logger.info("Initializing knowledge base...")
         docs = self._load_documents()
-
-        if not docs:
-            logger.warning("knowledge 目录为空，请放入文档后重启")
-            logger.info("知识库初始化完成（空）")
-            return
 
         self._chunks = []
         self._metadatas = []
+        self._vectorizer = None
+        self._tfidf_matrix = None
+
+        if not docs:
+            logger.warning("No in-scope documents found under knowledge/")
+            return
 
         for doc in docs:
             chunks = self._split_text(doc["content"])
@@ -98,15 +110,13 @@ class KnowledgeBase:
                 })
 
         if not self._chunks:
-            logger.warning("文档分块后为空")
+            logger.warning("No chunks were produced from in-scope documents")
             return
 
-        # 使用 jieba 分词 + TF-IDF
         def tokenize(text: str) -> str:
             return " ".join(jieba.cut(text))
 
         tokenized = [tokenize(c) for c in self._chunks]
-
         self._vectorizer = TfidfVectorizer(
             token_pattern=r"(?u)\b\w+\b",
             max_features=50000,
@@ -114,13 +124,12 @@ class KnowledgeBase:
         self._tfidf_matrix = self._vectorizer.fit_transform(tokenized)
 
         logger.info(
-            f"知识库就绪: {len(docs)} 个文档, {len(self._chunks)} 个文本片段"
+            "Knowledge base ready: %s documents, %s chunks",
+            len(docs),
+            len(self._chunks),
         )
 
-    def search(
-        self, query: str, top_k: int = None
-    ) -> List[Tuple[str, float, str]]:
-        """检索与 query 最相关的文档片段"""
+    def search(self, query: str, top_k: int = None) -> List[Tuple[str, float, str]]:
         if self._vectorizer is None or self._tfidf_matrix is None:
             self.initialize()
 
@@ -153,13 +162,11 @@ class KnowledgeBase:
             return results[:top_k]
 
         except Exception as e:
-            logger.error(f"检索失败: {e}")
+            logger.error("Search failed: %s", e)
             return []
 
     def get_document_count(self) -> int:
-        return len(set(
-            m["filename"] for m in self._metadatas
-        )) if self._metadatas else 0
+        return len(set(m["filename"] for m in self._metadatas)) if self._metadatas else 0
 
     def get_chunk_count(self) -> int:
         return len(self._chunks)
@@ -167,4 +174,7 @@ class KnowledgeBase:
     def get_all_chunks(self) -> List[Tuple[str, float, str]]:
         if not self._chunks:
             return []
-        return [(self._chunks[i], 0.0, self._metadatas[i]["filename"]) for i in range(len(self._chunks))]
+        return [
+            (self._chunks[i], 0.0, self._metadatas[i]["filename"])
+            for i in range(len(self._chunks))
+        ]

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>老师助手</title>
+<title>老师小助手 测试版</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
@@ -172,7 +172,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
 <body>
 
 <div class="header">
-  <h1 id="headerTitle">老师助手</h1>
+  <h1 id="headerTitle">老师小助手 测试版</h1>
   <div class="header-actions">
     <button class="settings-btn" onclick="openSettings()">⚙️</button>
     <button class="lang-btn" id="langToggle" onclick="toggleLang()">English</button>
@@ -182,10 +182,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
 <div class="chat-container" id="chatContainer">
   <div class="welcome" id="welcome">
     <div class="icon">👋</div>
-    <h2 id="welcomeTitle">您好！我是老师助手</h2>
+    <h2 id="welcomeTitle">你好，我是老师小助手测试版</h2>
     <p id="welcomeText">
-      请提问您在教学工作中遇到的问题<br>
-      I'm here to help with your teaching questions
+      当前仅覆盖一线老师知识库和已确认可公开的公司通用知识。<br>
+      不回答薪酬、绩效、处罚、审批结果等敏感问题。
     </p>
   </div>
 </div>
@@ -223,7 +223,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
 <div class="toast" id="toast"></div>
 
 <div class="input-area">
-  <input type="text" id="messageInput" placeholder="输入您的问题..." autocomplete="off" onkeydown="if(event.key==='Enter') send()">
+  <input type="text" id="messageInput" placeholder="请输入你的问题..." autocomplete="off" onkeydown="if(event.key==='Enter') send()">
   <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
 </div>
 
@@ -243,13 +243,13 @@ function t(zh, en) {
 }
 
 function updateUI() {
-  document.getElementById('headerTitle').textContent = t('老师助手', 'Teacher Assistant');
+  document.getElementById('headerTitle').textContent = t('老师小助手 测试版', 'Teacher Assistant Test');
   document.getElementById('langToggle').textContent = currentLang === 'zh' ? 'English' : '中文';
-  document.getElementById('messageInput').placeholder = t('输入您的问题...', 'Type your question...');
-  document.getElementById('welcomeTitle').textContent = t('您好！我是老师助手', 'Hello! I am Teacher Assistant');
+  document.getElementById('messageInput').placeholder = t('请输入你的问题...', 'Type your question...');
+  document.getElementById('welcomeTitle').textContent = t('你好，我是老师小助手测试版', 'Hello, I am the Teacher Assistant test version');
   document.getElementById('welcomeText').textContent = t(
-    '请提问您在教学工作中遇到的问题\nI\'m here to help with your teaching questions',
-    'I\'m here to help with your teaching questions\n请提问您在教学工作中遇到的问题'
+    '当前仅覆盖一线老师知识库和已确认可公开的公司通用知识。\n不回答薪酬、绩效、处罚、审批结果等敏感问题。',
+    'This test version only covers frontline teacher knowledge and approved common company knowledge.\nSensitive topics such as payroll, performance, penalties, and approval outcomes are not answered.'
   );
   localStorage.setItem('teacher_bot_lang', currentLang);
 }

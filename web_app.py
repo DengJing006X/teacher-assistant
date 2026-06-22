@@ -1,16 +1,17 @@
 """
-老师助手 - Web 网页版
-======================
-在微信里打开链接就能用的 AI 问答助手，支持中英双语。
-支持网页上传知识库文件，适合部署到云端。
-
-启动方式: python web_app.py
+Teacher Assistant - H5 test version
 """
 
-import sys
 import logging
+import sys
 import uuid
 from pathlib import Path
+from typing import Optional
+
+import uvicorn
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR))
@@ -19,6 +20,7 @@ import config as app_config
 from knowledge_base import KnowledgeBase
 from llm_engine import LLMEngine
 
+
 logging.basicConfig(
     level=getattr(logging, app_config.LOG_LEVEL),
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,15 +28,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("web_app")
 
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
-from typing import Optional
-import uvicorn
+app = FastAPI(title="Teacher Assistant H5 Test")
 
-app = FastAPI(title="老师助手 Teacher Assistant")
-
-# 全局变量
 kb: KnowledgeBase = None
 llm: LLMEngine = None
 
@@ -52,6 +47,18 @@ class ChatResponse(BaseModel):
     language: str
 
 
+class PasswordBody(BaseModel):
+    password: str
+
+
+def is_sensitive_question(question: str) -> bool:
+    lowered = question.lower()
+    for keyword in app_config.SENSITIVE_KEYWORDS:
+        if keyword.lower() in lowered:
+            return True
+    return False
+
+
 def reload_knowledge_base():
     global kb
     new_kb = KnowledgeBase(app_config)
@@ -62,33 +69,18 @@ def reload_knowledge_base():
 @app.on_event("startup")
 async def startup():
     global kb, llm
-    logger.info("正在初始化知识库...")
+    logger.info("Initializing H5 test version knowledge base...")
     kb = KnowledgeBase(app_config)
     kb.initialize()
-    doc_count = kb.get_document_count()
-    chunk_count = kb.get_chunk_count()
-    if doc_count > 0:
-        logger.info(f"知识库就绪: {doc_count} 个文档, {chunk_count} 个文本片段")
-    else:
-        logger.warning("knowledge 文件夹为空，请上传文档")
+    logger.info("Knowledge base ready: %s docs / %s chunks", kb.get_document_count(), kb.get_chunk_count())
 
-    logger.info("正在连接 AI 模型...")
+    logger.info("Connecting AI model...")
     llm = LLMEngine(app_config)
     ok, msg = llm.check_connection()
     if ok:
-        logger.info(f"AI 模型就绪: {msg}")
+        logger.info(msg)
     else:
-        logger.warning(f"AI 模型异常: {msg}")
-
-    logger.info("=" * 40)
-    logger.info(f"启动地址: http://localhost:{app_config.WEB_PORT}")
-    logger.info("在微信/浏览器中打开即可使用")
-    if app_config.WEB_HOST == "0.0.0.0":
-        import socket
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-        logger.info(f"局域网地址: http://{local_ip}:{app_config.WEB_PORT}")
-    logger.info("=" * 40)
+        logger.warning(msg)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -96,115 +88,71 @@ async def index():
     html_path = BASE_DIR / "templates" / "chat.html"
     if html_path.exists():
         return html_path.read_text(encoding="utf-8")
-    return HTMLResponse("<h1>老师助手</h1><p>页面加载失败</p>")
+    return HTMLResponse("<h1>Teacher Assistant</h1><p>Page load failed.</p>")
+
+
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok" if kb is not None and llm is not None else "error",
+        "documents": kb.get_document_count() if kb else 0,
+        "chunks": kb.get_chunk_count() if kb else 0,
+        "test_mode": app_config.TEST_MODE,
+        "allowed_categories": app_config.ALLOWED_KNOWLEDGE_CATEGORIES,
+    }
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
     global kb, llm
 
-    if kb is None or llm is None:
-        return ChatResponse(
-            session_id=req.session_id or "",
-            reply="系统正在初始化，请稍后再试" if req.language == "zh" else "System is initializing, please try again later",
-            language=req.language,
-        )
-
+    lang = req.language if req.language in ("zh", "en") else "zh"
     session_id = req.session_id or uuid.uuid4().hex[:8]
     question = req.message.strip()
-    lang = req.language if req.language in ("zh", "en") else "zh"
 
     if not question:
         return ChatResponse(
             session_id=session_id,
-            reply="请输入您的问题" if lang == "zh" else "Please enter your question",
+            reply="请输入您的问题。" if lang == "zh" else "Please enter your question.",
             language=lang,
         )
 
-    logger.info(f"[{session_id}] ({lang}) 提问: {question}")
+    if kb is None or llm is None:
+        return ChatResponse(
+            session_id=session_id,
+            reply="系统正在初始化，请稍后再试。" if lang == "zh" else "System is initializing, please try again later.",
+            language=lang,
+        )
 
-    # 知识库检索
-    if lang == "en":
-        # 英文提问时，直接把全部知识传给 AI 自行跨语言理解
-        all_chunks = kb.get_all_chunks()
-        if all_chunks:
-            context = "\n\n---\n\n".join(
-                f"[来自: {f}]\n{c}" for c, _, f in all_chunks
-            )
-            logger.info(f"英文查询，传递全部 {len(all_chunks)} 个文本片段给 AI")
-        else:
-            context = ""
-    else:
-        results = kb.search(question)
-        if results:
-            context = "\n\n---\n\n".join(
-                f"[来自: {f}]\n{c}" for c, _, f in results
-            )
-            logger.info(f"检索到 {len(results)} 个相关片段")
-        else:
-            # 搜索无结果时，传递全文给 AI 自行查找
-            all_chunks = kb.get_all_chunks()
-            if all_chunks:
-                context = "\n\n---\n\n".join(
-                    f"[来自: {f}]\n{c}" for c, _, f in all_chunks
-                )
-                logger.info(f"搜索无结果，传递全部 {len(all_chunks)} 个文本片段给 AI")
-            else:
-                context = ""
+    logger.info("[%s][%s] question: %s", session_id, lang, question)
 
-    # AI 回答
+    if is_sensitive_question(question):
+        reply = app_config.SENSITIVE_REPLY_ZH if lang == "zh" else app_config.SENSITIVE_REPLY_EN
+        reply = f"{app_config.DISCLAIMER_ZH if lang == 'zh' else app_config.DISCLAIMER_EN}\n\n{reply}"
+        return ChatResponse(session_id=session_id, reply=reply, language=lang)
+
+    results = kb.search(question)
+    if not results:
+        reply = app_config.UNHIT_REPLY_ZH if lang == "zh" else app_config.UNHIT_REPLY_EN
+        reply = f"{app_config.DISCLAIMER_ZH if lang == 'zh' else app_config.DISCLAIMER_EN}\n\n{reply}"
+        return ChatResponse(session_id=session_id, reply=reply, language=lang)
+
+    context = "\n\n---\n\n".join(f"[来源: {filename}]\n{chunk}" for chunk, _, filename in results)
+
     try:
         answer = llm.ask(
             question=question,
             context=context,
             language=lang,
-            history=req.history,
+            history=req.history[-app_config.MAX_HISTORY_MESSAGES:],
         )
     except Exception as e:
-        logger.error(f"AI 回答失败: {e}")
-        answer = (
-            "抱歉，AI 暂时无法回答，请稍后再试"
-            if lang == "zh"
-            else "Sorry, AI is unavailable. Please try again later."
-        )
+        logger.error("Answer generation failed: %s", e)
+        answer = "抱歉，AI 服务暂时不可用，请稍后再试。" if lang == "zh" else "Sorry, the AI service is temporarily unavailable. Please try again later."
 
     disclaimer = app_config.DISCLAIMER_ZH if lang == "zh" else app_config.DISCLAIMER_EN
     answer = f"{disclaimer}\n\n{answer}"
-
-    logger.info(f"[{session_id}] 回答: {answer[:80]}...")
-    return ChatResponse(
-        session_id=session_id,
-        reply=answer,
-        language=lang,
-    )
-
-
-@app.get("/api/health")
-async def health():
-    status = "ok"
-    issues = []
-    if kb is None:
-        status = "error"
-        issues.append("知识库未初始化")
-    if llm is None:
-        status = "error"
-        issues.append("AI模型未初始化")
-    doc_count = kb.get_document_count() if kb else 0
-    chunk_count = kb.get_chunk_count() if kb else 0
-    return {
-        "status": status,
-        "documents": doc_count,
-        "chunks": chunk_count,
-        "issues": issues,
-    }
-
-
-# ============================================================
-# 管理员验证
-# ============================================================
-
-class PasswordBody(BaseModel):
-    password: str
+    return ChatResponse(session_id=session_id, reply=answer, language=lang)
 
 
 @app.post("/api/verify-password")
@@ -214,15 +162,11 @@ async def verify_password(body: PasswordBody):
     return JSONResponse(status_code=403, content={"error": "密码错误"})
 
 
-# ============================================================
-# 文件管理 API
-# ============================================================
-
 @app.get("/api/files")
 async def list_files(t: str = ""):
-    """列出知识库中的所有文件"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
+
     knowdir = app_config.KNOWLEDGE_DIR
     knowdir.mkdir(parents=True, exist_ok=True)
     files = []
@@ -243,75 +187,53 @@ async def list_files(t: str = ""):
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), t: str = "", category: str = ""):
-    """上传知识库文件"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
-    knowdir = app_config.KNOWLEDGE_DIR
-    knowdir.mkdir(parents=True, exist_ok=True)
 
     if not file.filename.lower().endswith((".txt", ".md")):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "仅支持 .txt 和 .md 文件"},
-        )
+        return JSONResponse(status_code=400, content={"error": "仅支持 .txt 和 .md 文件"})
 
+    knowdir = app_config.KNOWLEDGE_DIR
     if category:
         knowdir = knowdir / category
-        knowdir.mkdir(parents=True, exist_ok=True)
+    knowdir.mkdir(parents=True, exist_ok=True)
 
     filepath = knowdir / file.filename
     content = await file.read()
     filepath.write_bytes(content)
 
     reload_knowledge_base()
-
-    doc_count = kb.get_document_count()
-    tag = f"[{category}] " if category else ""
-    logger.info(f"文件 {tag}{file.filename} 上传成功，共 {doc_count} 个文档")
-    return {
-        "message": f"{file.filename} 上传成功",
-        "documents": doc_count,
-    }
+    return {"message": f"{file.filename} 上传成功", "documents": kb.get_document_count()}
 
 
 @app.delete("/api/files/{filename}")
 async def delete_file(filename: str, t: str = "", category: str = ""):
-    """删除知识库中的文件"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
+
     import urllib.parse
-    filename = urllib.parse.unquote(filename)
+
+    decoded = urllib.parse.unquote(filename)
     knowdir = app_config.KNOWLEDGE_DIR
     if category:
         knowdir = knowdir / category
-    filepath = knowdir / filename
+    filepath = knowdir / decoded
 
     if not filepath.exists():
-        return JSONResponse(
-            status_code=404,
-            content={"error": f"文件 {filename} 不存在"},
-        )
+        return JSONResponse(status_code=404, content={"error": f"文件 {decoded} 不存在"})
 
     filepath.unlink()
     reload_knowledge_base()
-
-    doc_count = kb.get_document_count()
-    tag = f"[{category}] " if category else ""
-    logger.info(f"文件 {tag}{filename} 已删除，共 {doc_count} 个文档")
-    return {
-        "message": f"{filename} 已删除",
-        "documents": doc_count,
-    }
+    return {"message": f"{decoded} 已删除", "documents": kb.get_document_count()}
 
 
 @app.post("/api/reload")
 async def reload_kb(t: str = ""):
-    """手动重新加载知识库"""
     if t != app_config.ADMIN_PASSWORD:
         return JSONResponse(status_code=403, content={"error": "密码错误"})
+
     reload_knowledge_base()
-    doc_count = kb.get_document_count()
-    return {"message": "知识库已重新加载", "documents": doc_count}
+    return {"message": "知识库已重新加载", "documents": kb.get_document_count()}
 
 
 def main():

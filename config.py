@@ -1,51 +1,108 @@
 """
-老师助手 - 配置文件
-====================
-你只需要修改这个文件中的配置项即可使用。
+Teacher Assistant H5 - Test configuration
 """
 
 import os
 from pathlib import Path
 
-# ============================================================
-# 项目路径（不要修改）
-# ============================================================
+
 BASE_DIR = Path(__file__).parent
 KNOWLEDGE_DIR = BASE_DIR / "knowledge"
 VECTOR_STORE_DIR = BASE_DIR / "vector_store"
 
-# ============================================================
-# AI 模型配置（二选一）
-# ============================================================
 
-# --- 方案A：DeepSeek API（推荐，速度快，费用极低）---
+# ============================================================
+# Model configuration
+# ============================================================
 USE_DEEPSEEK = True
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-c46a7c3f2d1b409b86d516c3e5cf9416")
-DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 
-# --- 方案B：Ollama 本地模型（完全免费，无需联网）---
 USE_OLLAMA = False
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "qwen2.5:3b"
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+
 
 # ============================================================
-# 网页服务器配置
+# Web server
 # ============================================================
-WEB_HOST = "0.0.0.0"    # 允许外部设备访问
-WEB_PORT = int(os.environ.get("PORT", 8000))  # 端口号（云平台可通过环境变量指定）
+WEB_HOST = "0.0.0.0"
+WEB_PORT = int(os.environ.get("PORT", 8000))
+
 
 # ============================================================
-# 知识库配置
+# Test-mode rules
 # ============================================================
+TEST_MODE = True
+ALLOWED_KNOWLEDGE_CATEGORIES = ["教学", "制度"]
+MAX_HISTORY_MESSAGES = 10
+
 SIMILARITY_THRESHOLD = 0.08
 RETRIEVAL_COUNT = 5
 CHUNK_SIZE = 5000
 CHUNK_OVERLAP = 200
 
+SENSITIVE_KEYWORDS = [
+    "薪酬",
+    "工资",
+    "奖金",
+    "绩效",
+    "扣款",
+    "处罚",
+    "红线",
+    "申诉能不能过",
+    "申诉结果",
+    "审批结果",
+    "转正能不能过",
+    "晋升能不能过",
+    "淘汰",
+    "离职审批",
+    "后台",
+    "内部表",
+    "内部台账",
+    "周报",
+    "日会",
+    "个人信息",
+    "身份证",
+    "银行卡密码",
+    "访问密码",
+]
+
+TEST_SCOPE_NOTICE_ZH = (
+    "当前为测试版，仅覆盖一线老师知识库和已确认可公开的公司通用知识。"
+    "不回答薪酬、绩效、处罚、审批结果、申诉结果、内部台账等敏感问题。"
+)
+TEST_SCOPE_NOTICE_EN = (
+    "This is a test version. It only covers frontline teacher knowledge and approved company-wide common knowledge. "
+    "Sensitive topics such as payroll, performance, penalties, approval outcomes, appeal outcomes, and internal records are not answered."
+)
+
+UNHIT_REPLY_ZH = (
+    "这个问题当前知识库还没有可直接回答的已确认答案，我先帮你记录为待补充问题。\n"
+    "如果比较紧急，请先联系直属负责人或对应教务/职能负责人处理。"
+)
+UNHIT_REPLY_EN = (
+    "The current knowledge base does not yet have a confirmed answer for this question.\n"
+    "If it is urgent, please contact your supervisor or the relevant teaching or functional owner first."
+)
+
+SENSITIVE_REPLY_ZH = (
+    "这个问题涉及敏感信息、审批结果或个案判断，我暂时不能直接给最终结论。\n"
+    "建议你同步直属负责人或对应负责人确认；如果你愿意，我可以先帮你整理需要说明的材料。"
+)
+SENSITIVE_REPLY_EN = (
+    "This question involves sensitive information, approval outcomes, or case-by-case judgment, so I cannot provide a final conclusion directly.\n"
+    "Please confirm with your supervisor or the relevant owner first."
+)
+
+
 # ============================================================
-# 机器人回答风格（中文）
+# Prompts
 # ============================================================
-BOT_PROMPT_ZH = """你是一个知识问答助手。下面是从知识库中检索到的内容，请据此回答问题。
+BOT_PROMPT_ZH = """你是“老师小助手”测试版，只能根据给定知识回答问题。
+
+【测试范围】
+{scope_notice}
 
 【知识库内容】
 {context}
@@ -53,46 +110,52 @@ BOT_PROMPT_ZH = """你是一个知识问答助手。下面是从知识库中检�
 【用户问题】
 {question}
 
-规则：
-1. 只根据上面的知识库内容回答，仔细阅读全文查找相关信息
-2. 如果内容完整包含答案，请直接完整呈现，不要精简或遗漏
-3. 如果确实没有任何相关信息，请说"未找到相关信息"
-4. 回答时保留关键信息的完整性"""
+请严格遵守：
+1. 只能基于给定知识回答，不得补充未给出的制度、结论或承诺。
+2. 优先使用以下结构回答：结论、流程、材料、提醒。
+3. 不要让用户自己去找文档。
+4. 不要回答薪酬、绩效、处罚、审批结果、申诉结果、内部链接、后台表格。
+5. 如果上下文不足以支持回答，直接返回：{unhit_reply}
+"""
 
-# ============================================================
-# 机器人回答风格（English）
-# ============================================================
-BOT_PROMPT_EN = """You are an experienced teacher assistant helping new teachers with their work.
-The knowledge base below is in Chinese. Carefully read ALL of it - the information the user needs IS in this Chinese text. 
-Find the information most relevant to the user's English question and translate the answer to English.
+BOT_PROMPT_EN = """You are the test version of "Teacher Assistant" and may only answer from the provided knowledge.
 
-Rules:
-1. Only answer based on the provided knowledge, do not make up information
-2. READ THE CHINESE TEXT CAREFULLY - the answer is likely there even if it doesn't seem to match the English keywords exactly
-3. If truly no relevant information exists in the Chinese text, say so honestly
-4. Keep answers concise and practical
+Test scope:
+{scope_notice}
 
 Conversation history:
 {history}
 
-【Knowledge Base Content (Chinese)】
+Knowledge base content:
 {context}
 
-Current question: {question}
+Current question:
+{question}
+
+Rules:
+1. Answer only from the provided knowledge.
+2. Prefer this structure: Conclusion, Steps, Materials, Reminder.
+3. Do not tell the user to search documents by themselves.
+4. Do not answer payroll, performance, penalties, approval outcomes, appeal outcomes, internal links, or internal records.
+5. If the context is insufficient, return exactly: {unhit_reply}
 """
 
-# ============================================================
-# 管理密码（用于上传/删除知识库文件）
-# ============================================================
-ADMIN_PASSWORD = "WH0804"
 
 # ============================================================
-# 回复免责声明（显示在每条回复最前面）
+# Admin / UI
 # ============================================================
-DISCLAIMER_ZH = "小助手刚上岗，回复仅供参考，有疑问欢迎联系上级和阿九~"
-DISCLAIMER_EN = "Disclaimer: This AI assistant is new, answers are for reference only. Please contact your supervisor for confirmation."
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "WH0804")
+
+DISCLAIMER_ZH = (
+    "当前为测试版，回答仅供参考；如涉及审批、判责或敏感事项，请联系直属负责人确认。"
+)
+DISCLAIMER_EN = (
+    "This is a test version. Answers are for reference only. "
+    "For approvals, judgment, or sensitive matters, please confirm with your supervisor."
+)
+
 
 # ============================================================
-# 日志设置
+# Logging
 # ============================================================
-LOG_LEVEL = "INFO"
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
