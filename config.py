@@ -37,7 +37,7 @@ TEST_MODE = True
 ALLOWED_KNOWLEDGE_CATEGORIES = ["教学", "制度"]
 MAX_HISTORY_MESSAGES = 10
 
-SIMILARITY_THRESHOLD = 0.08
+SIMILARITY_THRESHOLD = 0.10
 RETRIEVAL_COUNT = 5
 CHUNK_SIZE = 5000
 CHUNK_OVERLAP = 200
@@ -47,6 +47,7 @@ SENSITIVE_KEYWORDS = [
     "工资",
     "奖金",
     "绩效",
+    "扣绩效",
     "扣款",
     "处罚",
     "红线",

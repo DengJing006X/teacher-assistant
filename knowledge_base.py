@@ -80,9 +80,25 @@ class KnowledgeBase:
         return docs
 
     def _split_text(self, text: str) -> List[str]:
+        text = text.strip()
+        if not text:
+            return []
+
+        sections = re.split(r"(?=^##\s+)", text, flags=re.MULTILINE)
         chunks = []
+        for section in sections:
+            section = section.strip()
+            if not section:
+                continue
+            if section.startswith("## "):
+                chunks.append(section)
+
+        if chunks:
+            return chunks
+
         paragraphs = re.split(r"\n\s*\n", text)
         current = ""
+        fallback_chunks = []
 
         for para in paragraphs:
             para = para.strip()
@@ -93,16 +109,13 @@ class KnowledgeBase:
                 current += para + "\n\n"
             else:
                 if current:
-                    chunks.append(current.strip())
+                    fallback_chunks.append(current.strip())
                 current = para + "\n\n"
 
         if current:
-            chunks.append(current.strip())
+            fallback_chunks.append(current.strip())
 
-        if not chunks and text.strip():
-            chunks = [text.strip()]
-
-        return chunks
+        return fallback_chunks or [text]
 
     def initialize(self):
         from sklearn.feature_extraction.text import TfidfVectorizer
@@ -150,6 +163,9 @@ class KnowledgeBase:
             len(self._chunks),
         )
 
+    def _normalize_text(self, text: str) -> str:
+        return re.sub(r"[？?、，。；：\s]", "", text.lower())
+
     def search(self, query: str, top_k: int = None) -> List[Tuple[str, float, str]]:
         if self._vectorizer is None or self._tfidf_matrix is None:
             self.initialize()
@@ -163,6 +179,25 @@ class KnowledgeBase:
         try:
             import jieba
             from sklearn.metrics.pairwise import cosine_similarity
+
+            normalized_query = self._normalize_text(query)
+
+            direct_hits = []
+            for i, chunk in enumerate(self._chunks):
+                first_line = chunk.splitlines()[0].strip()
+                title = first_line[3:].strip() if first_line.startswith("## ") else first_line
+                normalized_title = self._normalize_text(title)
+                if normalized_query and (
+                    normalized_query in normalized_title or normalized_title in normalized_query
+                ):
+                    direct_hits.append((
+                        self._chunks[i],
+                        1.0,
+                        self._metadatas[i]["filename"],
+                    ))
+
+            if direct_hits:
+                return direct_hits[:top_k]
 
             def tokenize(text: str) -> str:
                 return " ".join(jieba.cut(text))
