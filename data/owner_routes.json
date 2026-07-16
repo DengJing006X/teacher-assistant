@@ -1,0 +1,108 @@
+{
+  "description": "未命中问题负责人路由。测试阶段所有部门负责人统一为 WH0804，对外展示阿九；正式上线后按部门替换负责人。",
+  "default_owner": {
+    "department": "组织建设",
+    "owner_name": "阿九",
+    "employee_no": "WH0804",
+    "user_id": "0104205445101186080",
+    "webhook": ""
+  },
+  "routes": [
+    {
+      "department": "考勤小姐姐",
+      "keywords": ["考勤", "签到", "迟到", "旷课", "请假", "排班"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "IT服务台",
+      "keywords": ["账号", "密码", "登录", "系统", "设备", "网络", "钉钉"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学-demo组",
+      "keywords": ["demo", "Demo", "试听"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学-粤语教学",
+      "keywords": ["粤语"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学-台湾教学",
+      "keywords": ["台湾"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学-英语教学",
+      "keywords": ["英语"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学-外教教学",
+      "keywords": ["外教"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "教学",
+      "keywords": ["上课", "课件", "学生", "学员", "班级", "课程", "补课", "顺延"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "中台-排课教务",
+      "keywords": ["排课", "调课", "代课", "插班"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "中台-数据运营",
+      "keywords": ["数据", "报表", "统计", "指标"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "中台-新师培训",
+      "keywords": ["新师", "入职", "培训", "主备", "述职", "竞聘", "转岗"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    },
+    {
+      "department": "中台-组织建设",
+      "keywords": ["OA", "流程", "银行卡", "工资卡", "组织", "离职", "孕期"],
+      "owner_name": "阿九",
+      "employee_no": "WH0804",
+      "user_id": "0104205445101186080",
+      "webhook": ""
+    }
+  ]
+}

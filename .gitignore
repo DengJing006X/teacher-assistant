@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.log
+
+# Local runtime data and private DingTalk webhook/session config.
+data/*.jsonl
+data/governance_channel.json
+data/reports/
+
+# Local tunnel binary and backups.
+cloudflared.exe
+backup_before_h5_test/
+
+# Local vector stores or model indexes.
+vector_store/

@@ -1,5 +1,5 @@
 """
-Teacher Assistant H5 - Test configuration
+Teacher Assistant - shared configuration for H5 and DingTalk test version
 """
 
 import os
@@ -9,6 +9,16 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 KNOWLEDGE_DIR = BASE_DIR / "knowledge"
 VECTOR_STORE_DIR = BASE_DIR / "vector_store"
+
+
+# ============================================================
+# DingTalk application
+# ============================================================
+DINGTALK_APP_ID = os.environ.get("DINGTALK_APP_ID", "")
+DINGTALK_AGENT_ID = os.environ.get("DINGTALK_AGENT_ID", "")
+DINGTALK_CLIENT_ID = os.environ.get("DINGTALK_CLIENT_ID", "")
+DINGTALK_CLIENT_SECRET = os.environ.get("DINGTALK_CLIENT_SECRET", "")
+DINGTALK_CORP_ID = os.environ.get("DINGTALK_CORP_ID", "")
 
 
 # ============================================================
